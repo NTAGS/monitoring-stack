@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: splunk-data
+  namespace: splunk
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: splunk
+  namespace: splunk
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: splunk
+  template:
+    metadata:
+      labels:
+        app: splunk
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: vm1
+      containers:
+        - name: splunk
+          image: splunk/splunk:10.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SPLUNK_START_ARGS
+              value: --accept-license
+            - name: SPLUNK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: splunk-credentials
+                  key: admin-password
+          ports:
+            - name: splunk-web
+              containerPort: 8000
+              hostPort: 8000
+            - name: management
+              containerPort: 8089
+              hostPort: 8089
+          volumeMounts:
+            - name: splunk-data
+              mountPath: /opt/splunk/var
+            - name: splunk-data
+              mountPath: /opt/splunk/etc
+              subPath: etc
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              memory: 4Gi
+      volumes:
+        - name: splunk-data
+          persistentVolumeClaim:
+            claimName: splunk-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk
+  namespace: splunk
+spec:
+  type: ClusterIP
+  selector:
+    app: splunk
+  ports:
+    - name: web
+      port: 8000
+      targetPort: 8000
+    - name: management
+      port: 8089
+      targetPort: 8089

@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: monitoring
+data:
+  fluent.conf: |
+    <system>
+      log_level info
+    </system>
+
+    # Collect Kubernetes container logs.
+    <source>
+      @type tail
+      @id tail_kubernetes_container_logs
+
+      path /var/log/containers/*.log
+      exclude_path ["/var/log/containers/fluentd-*_monitoring_*.log"]
+
+      pos_file /var/lib/fluentd/containers.pos
+      tag kubernetes.*
+
+      read_from_head false
+      refresh_interval 5
+      rotate_wait 5
+
+      <parse>
+        @type cri
+      </parse>
+    </source>
+
+    # Add Kubernetes pod, namespace and container metadata.
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id kubernetes_metadata
+    </filter>
+
+    # Add a consistent cluster identifier.
+    <filter kubernetes.**>
+      @type record_transformer
+      <record>
+        cluster_name k8s-observability-poc
+      </record>
+    </filter>
+
+    # Send newline-delimited JSON records to Splunk HEC.
+    <match kubernetes.**>
+      @type http
+      @id splunk_hec_output
+
+      endpoint https://192.168.1.15:8088/services/collector/raw?channel=a6d3b1c2-4e5f-4a7b-8c9d-0e1f2a3b4c5d&index=main&sourcetype=_json&source=kubernetes
+      http_method post
+      content_type text/plain
+
+      headers {"Authorization":"Splunk #{ENV['SPLUNK_HEC_TOKEN']}"}
+
+      tls_verify_mode none
+      open_timeout 10
+      read_timeout 30
+      reuse_connections true
+
+      <format>
+        @type json
+      </format>
+
+      <buffer>
+        @type file
+        path /var/lib/fluentd/buffer/splunk
+
+        flush_mode interval
+        flush_interval 5s
+        flush_thread_count 2
+
+        chunk_limit_size 2m
+        total_limit_size 512m
+
+        retry_type exponential_backoff
+        retry_forever true
+        retry_max_interval 30s
+
+        overflow_action block
+        flush_at_shutdown true
+      </buffer>
+    </match>

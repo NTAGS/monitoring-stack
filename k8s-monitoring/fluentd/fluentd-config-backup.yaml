@@ -1,0 +1,90 @@
+apiVersion: v1
+data:
+  fluent.conf: |
+    <system>
+      log_level info
+    </system>
+
+    # Collect Kubernetes container logs.
+    <source>
+      @type tail
+      @id tail_kubernetes_container_logs
+
+      path /var/log/containers/*.log
+      exclude_path ["/var/log/containers/fluentd-*_monitoring_*.log"]
+
+      pos_file /var/lib/fluentd/containers.pos
+      tag kubernetes.*
+
+      read_from_head false
+      refresh_interval 5
+      rotate_wait 5
+
+      <parse>
+        @type cri
+      </parse>
+    </source>
+
+    # Add Kubernetes pod, namespace and container metadata.
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id kubernetes_metadata
+    </filter>
+
+    # Add a consistent cluster identifier.
+    <filter kubernetes.**>
+      @type record_transformer
+      <record>
+        cluster_name k8s-observability-poc
+      </record>
+    </filter>
+
+    # Send newline-delimited JSON records to Splunk HEC.
+    <match kubernetes.**>
+      @type http
+      @id splunk_hec_output
+
+      endpoint https://192.168.1.15:8088/services/collector/raw?channel=a6d3b1c2-4e5f-4a7b-8c9d-0e1f2a3b4c5d&index=main&sourcetype=_json&source=kubernetes
+      http_method post
+      content_type text/plain
+
+      headers {"Authorization":"Splunk #{ENV['SPLUNK_HEC_TOKEN']}"}
+
+      tls_verify_mode none
+      open_timeout 10
+      read_timeout 30
+      reuse_connections true
+
+      <format>
+        @type json
+      </format>
+
+      <buffer>
+        @type file
+        path /var/lib/fluentd/buffer/splunk
+
+        flush_mode interval
+        flush_interval 5s
+        flush_thread_count 2
+
+        chunk_limit_size 2m
+        total_limit_size 512m
+
+        retry_type exponential_backoff
+        retry_forever true
+        retry_max_interval 30s
+
+        overflow_action block
+        flush_at_shutdown true
+      </buffer>
+    </match>
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"fluent.conf":"\u003csystem\u003e\n  log_level info\n\u003c/system\u003e\n\n# Collect Kubernetes container logs.\n\u003csource\u003e\n  @type tail\n  @id tail_kubernetes_container_logs\n\n  path /var/log/containers/*.log\n  exclude_path [\"/var/log/containers/fluentd-*_monitoring_*.log\"]\n\n  pos_file /var/lib/fluentd/containers.pos\n  tag kubernetes.*\n\n  read_from_head false\n  refresh_interval 5\n  rotate_wait 5\n\n  \u003cparse\u003e\n    @type cri\n  \u003c/parse\u003e\n\u003c/source\u003e\n\n# Add Kubernetes pod, namespace and container metadata.\n\u003cfilter kubernetes.**\u003e\n  @type kubernetes_metadata\n  @id kubernetes_metadata\n\u003c/filter\u003e\n\n# Add a consistent cluster identifier.\n\u003cfilter kubernetes.**\u003e\n  @type record_transformer\n  \u003crecord\u003e\n    cluster_name k8s-observability-poc\n  \u003c/record\u003e\n\u003c/filter\u003e\n\n# Send newline-delimited JSON records to Splunk HEC.\n\u003cmatch kubernetes.**\u003e\n  @type http\n  @id splunk_hec_output\n\n  endpoint https://192.168.1.15:8088/services/collector/raw?channel=a6d3b1c2-4e5f-4a7b-8c9d-0e1f2a3b4c5d\u0026index=main\u0026sourcetype=_json\u0026source=kubernetes\n  http_method post\n  content_type text/plain\n\n  headers {\"Authorization\":\"Splunk #{ENV['SPLUNK_HEC_TOKEN']}\"}\n\n  tls_verify_mode none\n  open_timeout 10\n  read_timeout 30\n  reuse_connections true\n\n  \u003cformat\u003e\n    @type json\n  \u003c/format\u003e\n\n  \u003cbuffer\u003e\n    @type file\n    path /var/lib/fluentd/buffer/splunk\n\n    flush_mode interval\n    flush_interval 5s\n    flush_thread_count 2\n\n    chunk_limit_size 2m\n    total_limit_size 512m\n\n    retry_type exponential_backoff\n    retry_forever true\n    retry_max_interval 30s\n\n    overflow_action block\n    flush_at_shutdown true\n  \u003c/buffer\u003e\n\u003c/match\u003e\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"fluentd-config","namespace":"monitoring"}}
+  creationTimestamp: "2026-11-01T05:56:10Z"
+  name: fluentd-config
+  namespace: monitoring
+  resourceVersion: "2233"
+  uid: 16b6ff46-791f-4977-acaf-bc2087f1d4b4

@@ -1,0 +1,111 @@
+groups:
+  - name: infrastructure-alerts
+    rules:
+
+      # CPU Usage - Warning
+      - alert: HighCPUUsage
+        expr: |
+          100 * (1 - avg by(instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          )) > 75
+        for: 5m
+        labels:
+          severity: warning
+          resource: cpu
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 75% for 5 minutes."
+
+      # CPU Usage - Critical
+      - alert: CriticalCPUUsage
+        expr: |
+          100 * (1 - avg by(instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          )) > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: cpu
+        annotations:
+          summary: "Critical CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 90% for 5 minutes."
+
+      # Memory Usage - Warning
+      - alert: HighMemoryUsage
+        expr: |
+          100 * (1 -
+            node_memory_MemAvailable_bytes /
+            node_memory_MemTotal_bytes
+          ) > 75
+        for: 5m
+        labels:
+          severity: warning
+          resource: memory
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 75% for 5 minutes."
+
+      # Memory Usage - Critical
+      - alert: CriticalMemoryUsage
+        expr: |
+          100 * (1 -
+            node_memory_MemAvailable_bytes /
+            node_memory_MemTotal_bytes
+          ) > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: memory
+        annotations:
+          summary: "Critical memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90% for 5 minutes."
+
+      # Disk Usage - Warning
+      - alert: HighDiskUsage
+        expr: |
+          100 * (
+            1 -
+            node_filesystem_avail_bytes{
+              fstype!~"tmpfs|overlay|squashfs"
+            } /
+            node_filesystem_size_bytes{
+              fstype!~"tmpfs|overlay|squashfs"
+            }
+          ) > 75
+        for: 5m
+        labels:
+          severity: warning
+          resource: disk
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 75% on mountpoint {{ $labels.mountpoint }}."
+
+      # Disk Usage - Critical
+      - alert: CriticalDiskUsage
+        expr: |
+          100 * (
+            1 -
+            node_filesystem_avail_bytes{
+              fstype!~"tmpfs|overlay|squashfs"
+            } /
+            node_filesystem_size_bytes{
+              fstype!~"tmpfs|overlay|squashfs"
+            }
+          ) > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: disk
+        annotations:
+          summary: "Critical disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 90% on mountpoint {{ $labels.mountpoint }}."
+
+      # Node Exporter Availability
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node exporter down on {{ $labels.instance }}"
+          description: "Prometheus cannot scrape this node exporter."

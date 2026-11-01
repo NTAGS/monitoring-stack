@@ -1,0 +1,34 @@
+receivers:
+  fluentforward:
+    endpoint: 0.0.0.0:24224
+
+processors:
+  transform/sourcetype:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["com.splunk.sourcetype"], "123") where attributes["kubernetes"]["namespace_name"] == "app-123-lob"
+      - context: log
+        statements:
+          - set(attributes["com.splunk.sourcetype"], "143") where attributes["kubernetes"]["namespace_name"] == "app-143-lob"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  splunk_hec:
+    token: ${env:SPLUNK_HEC_TOKEN}
+    endpoint: "https://192.168.1.15:8088/services/collector"
+    source: kubernetes
+    sourcetype: _json
+    index: main
+    tls:
+      insecure_skip_verify: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [fluentforward]
+      processors: [transform/sourcetype]
+      exporters: [debug, splunk_hec]

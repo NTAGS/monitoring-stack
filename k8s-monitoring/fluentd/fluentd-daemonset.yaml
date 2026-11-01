@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: monitoring
+  labels:
+    app: fluentd
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: fluentd
+
+    spec:
+      serviceAccountName: fluentd
+      terminationGracePeriodSeconds: 30
+
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      tolerations:
+        - operator: Exists
+
+      containers:
+        - name: fluentd
+          image: fluent/fluentd-kubernetes-daemonset:v1.20.1-debian-forward-arm64-1.0
+          imagePullPolicy: IfNotPresent
+
+          args:
+            - -c
+            - /fluentd/etc/fluent.conf
+
+          env:
+            - name: FLUENT_UID
+              value: "0"
+
+            - name: SPLUNK_HEC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: splunk-hec
+                  key: hec-token
+
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+
+            - name: fluentd-state
+              mountPath: /var/lib/fluentd
+
+            - name: fluentd-config
+              mountPath: /fluentd/etc/fluent.conf
+              subPath: fluent.conf
+              readOnly: true
+
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
+
+        - name: fluentd-state
+          hostPath:
+            path: /var/lib/fluentd
+            type: DirectoryOrCreate
+
+        - name: fluentd-config
+          configMap:
+            name: fluentd-config

@@ -1,0 +1,220 @@
+# Application code for namespace 123
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flask-app-code
+  namespace: app-123-lob
+data:
+  app.py: |
+    from flask import Flask, request
+    import os
+    import json
+    import datetime
+
+    app = Flask(__name__)
+
+    APP_ID = os.getenv("APP_ID", "123_UNKNOWN")
+    NAMESPACE = os.getenv("POD_NAMESPACE", "unknown")
+
+    @app.route("/", methods=["GET", "POST"])
+    def home():
+        if request.method == "POST":
+            action = request.form.get("action", "unknown")
+
+            event = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "application_id": APP_ID,
+                "namespace": NAMESPACE,
+                "action": action,
+                "event": "button_clicked"
+            }
+
+            print(json.dumps(event), flush=True)
+
+            return f"<h2>{action} selected successfully!</h2><a href='/'>Go back</a>"
+
+        return """
+        <h1>Application 123 - LOB</h1>
+        <form method="POST">
+          <button name="action" value="Groceries">Groceries</button>
+          <button name="action" value="Electronics">Electronics</button>
+          <button name="action" value="Restaurants">Restaurants</button>
+        </form>
+        """
+
+    @app.route("/health")
+    def health():
+        return "OK", 200
+
+    app.run(host="0.0.0.0", port=5000)
+
+---
+# Application 123 Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app
+  namespace: app-123-lob
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-app
+  template:
+    metadata:
+      labels:
+        app: flask-app
+    spec:
+      containers:
+        - name: flask-app
+          image: python:3.12-slim
+          command: ["sh", "-c", "pip install --no-cache-dir flask && python /app/app.py"]
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_ID
+              value: "123_<APP_SHORT_NAME>_LOB"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: app-code
+          configMap:
+            name: flask-app-code
+
+---
+# Application 123 Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-app
+  namespace: app-123-lob
+spec:
+  type: NodePort
+  selector:
+    app: flask-app
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30080
+
+---
+# Application code for namespace 143
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flask-app-code
+  namespace: app-143-lob
+data:
+  app.py: |
+    from flask import Flask, request
+    import os
+    import json
+    import datetime
+
+    app = Flask(__name__)
+
+    APP_ID = os.getenv("APP_ID", "143_UNKNOWN")
+    NAMESPACE = os.getenv("POD_NAMESPACE", "unknown")
+
+    @app.route("/", methods=["GET", "POST"])
+    def home():
+        if request.method == "POST":
+            action = request.form.get("action", "unknown")
+
+            event = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "application_id": APP_ID,
+                "namespace": NAMESPACE,
+                "action": action,
+                "event": "button_clicked"
+            }
+
+            print(json.dumps(event), flush=True)
+
+            return f"<h2>{action} selected successfully!</h2><a href='/'>Go back</a>"
+
+        return """
+        <h1>Application 143 - LOB</h1>
+        <form method="POST">
+          <button name="action" value="Groceries">Groceries</button>
+          <button name="action" value="Electronics">Electronics</button>
+          <button name="action" value="Restaurants">Restaurants</button>
+        </form>
+        """
+
+    @app.route("/health")
+    def health():
+        return "OK", 200
+
+    app.run(host="0.0.0.0", port=5000)
+
+---
+# Application 143 Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app
+  namespace: app-143-lob
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-app
+  template:
+    metadata:
+      labels:
+        app: flask-app
+    spec:
+      containers:
+        - name: flask-app
+          image: python:3.12-slim
+          command: ["sh", "-c", "pip install --no-cache-dir flask && python /app/app.py"]
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_ID
+              value: "143_<APP_SHORT_NAME>_LOB"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: app-code
+          configMap:
+            name: flask-app-code
+
+---
+# Application 143 Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-app
+  namespace: app-143-lob
+spec:
+  type: NodePort
+  selector:
+    app: flask-app
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30081
